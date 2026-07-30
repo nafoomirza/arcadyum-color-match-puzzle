@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game Blitz</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #CCCCCC;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+        }
+        #pause-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: none;
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: none;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: block;
+        }
+        #start-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #restart-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #resume-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #main-menu-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #instructions-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #000000;
+            background-color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #high-score-list {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #000000;
+        }
+    </style>
+
+<style id="cfs-reset">
+  html, body { margin:0; padding:0; width:100%; height:100%;
+               overflow:hidden; background:#000;
+               -webkit-user-select:none; user-select:none;
+               touch-action:none; overscroll-behavior:none; }
+  #cfs-stage { position:fixed; inset:0; width:100vw; height:100dvh;
+               display:flex; align-items:center; justify-content:center; }
+  canvas { display:block; max-width:100%; max-height:100%; }
+</style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="hud"></div>
+        <div id="pause-screen">
+            <button id="resume-button">Resume</button>
+            <button id="restart-button">Restart</button>
+            <button id="main-menu-button">Main Menu</button>
+        </div>
+        <div id="game-over-screen">
+            <button id="restart-button">Restart</button>
+            <button id="main-menu-button">Main Menu</button>
+        </div>
+        <div id="start-screen">
+            <h1>Game Blitz</h1>
+            <button id="start-button">Start</button>
+            <div id="high-score-list"></div>
+            <button id="instructions-button">Instructions</button>
+        </div>
+    </div>
+    <script>
+        let canvas = document.getElementById('game-canvas');
+        let ctx = canvas.getContext('2d');
+        let hud = document.getElementById('hud');
+        let pauseScreen = document.getElementById('pause-screen');
+        let gameOverScreen = document.getElementById('game-over-screen');
+        let startScreen = document.getElementById('start-screen');
+        let startButton = document.getElementById('start-button');
+        let restartButton = document.getElementById('restart-button');
+        let resumeButton = document.getElementById('resume-button');
+        let mainMenuButton = document.getElementById('main-menu-button');
+        let instructionsButton = document.getElementById('instructions-button');
+        let highScoreList = document.getElementById('high-score-list');
+        let highScores = [];
+        let currentScore = 0;
+        let bestScore = 0;
+        let timeRemaining = 60;
+        let level = 1;
+        let grid = [];
+        let selectedTile = null;
+        let lastArrowKey = null;
+        let isGameRunning = false;
+        let isGamePaused = false;
+        let tileSize = 40;
+        let gapSize = 5;
+        let tileColors = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF00FF'];
+        let tileShapes = ['circle', 'square', 'triangle', 'diamond', 'hexagon'];
+        let audioContext = new AudioContext();
+        let swapSound = null;
+        let clearSound = null;
+        let timeUpSound = null;
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.fillStyle = '#CCCCCC';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            hud.style.fontSize = Math.min(canvas.width, canvas.height) / 20 + 'px';
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', restartGame);
+            resumeButton.addEventListener('click', resumeGame);
+            mainMenuButton.addEventListener('click', mainMenu);
+            instructionsButton.addEventListener('click', instructions);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            document.addEventListener('touchstart', handleTouchStart);
+            document.addEventListener('touchmove', handleTouchMove);
+            document.addEventListener('touchend', handleTouchEnd);
+            window.addEventListener('resize', resize);
+            window.addEventListener('blur', pauseGame);
+            window.addEventListener('focus', resumeGame);
+            generateGrid();
+            generateSounds();
+        }
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            isGameRunning = true;
+            isGamePaused = false;
+            timeRemaining = 60;
+            level = 1;
+            currentScore = 0;
+            bestScore = 0;
+            generateGrid();
+            updateHud();
+            gameLoop();
+        }
+
+        function restartGame() {
+            startScreen.style.display = 'none';
+            isGameRunning = true;
+            isGamePaused = false;
+            timeRemaining = 60;
+            level = 1;
+            currentScore = 0;
+            bestScore = 0;
+            generateGrid();
+            updateHud();
+            gameLoop();
+        }
+
+        function resumeGame() {
+            isGamePaused = false;
+            gameLoop();
+        }
+
+        function mainMenu() {
+            startScreen.style.display = 'block';
+            isGameRunning = false;
+            isGamePaused = false;
+        }
+
+        function instructions() {
+            alert('Instructions: Use the arrow keys to select a tile, and the space bar to swap it with the adjacent tile. On mobile, tap on a tile to select it, and then tap on an adjacent tile to swap them.');
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                lastArrowKey = event.key;
+            } else if (event.key === ' ') {
+                swapTiles();
+            }
+        }
+
+        function handleKeyUp(event) {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                lastArrowKey = null;
+            }
+        }
+
+        function handleTouchStart(event) {
+            let touch = event.touches[0];
+            let x = touch.clientX;
+            let y = touch.clientY;
+            let tileX = Math.floor(x / (tileSize + gapSize));
+            let tileY = Math.floor(y / (tileSize + gapSize));
+            if (tileX >= 0 && tileX < 8 && tileY >= 0 && tileY < 8) {
+                selectedTile = [tileX, tileY];
+            }
+        }
+
+        function handleTouchMove(event) {
+            let touch = event.touches[0];
+            let x = touch.clientX;
+            let y = touch.clientY;
+            let tileX = Math.floor(x / (tileSize + gapSize));
+            let tileY = Math.floor(y / (tileSize + gapSize));
+            if (tileX >= 0 && tileX < 8 && tileY >= 0 && tileY < 8) {
+                if (selectedTile !== null) {
+                    swapTiles([tileX, tileY]);
+                }
+            }
+        }
+
+        function handleTouchEnd(event) {
+            selectedTile = null;
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.fillStyle = '#CCCCCC';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            hud.style.fontSize = Math.min(canvas.width, canvas.height) / 20 + 'px';
+        }
+
+        function pauseGame() {
+            isGamePaused = true;
+            pauseScreen.style.display = 'block';
+        }
+
+        function generateGrid() {
+            grid = [];
+            for (let i = 0; i < 8; i++) {
+                grid[i] = [];
+                for (let j = 0; j < 8; j++) {
+                    grid[i][j] = {
+                        color: tileColors[Math.floor(Math.random() * tileColors.length)],
+                        shape: tileShapes[Math.floor(Math.random() * tileShapes.length)],
+                        locked: false
+                    };
+                }
+            }
+            for (let i = 0; i < level / 5 * 2; i++) {
+                let x = Math.floor(Math.random() * 8);
+                let y = Math.floor(Math.random() * 8);
+                grid[x][y].locked = true;
+            }
+        }
+
+        function generateSounds() {
+            swapSound = audioContext.createOscillator();
+            swapSound.type = 'sine';
+            swapSound.frequency.value = 440;
+            swapSound.connect(audioContext.destination);
+            swapSound.start();
+            swapSound.stop(audioContext.currentTime + 0.1);
+            clearSound = audioContext.createOscillator();
+            clearSound.type = 'sine';
+            clearSound.frequency.value = 220;
+            clearSound.connect(audioContext.destination);
+            clearSound.start();
+            clearSound.stop(audioContext.currentTime + 0.1);
+            timeUpSound = audioContext.createOscillator();
+            timeUpSound.type = 'sine';
+            timeUpSound.frequency.value = 440;
+            timeUpSound.connect(audioContext.destination);
+            timeUpSound.start();
+            timeUpSound.stop(audioContext.currentTime + 0.1);
+        }
+
+        function swapTiles(tile) {
+            if (selectedTile !== null) {
+                let x1 = selectedTile[0];
+                let y1 = selectedTile[1];
+                let x2 = tile[0];
+                let y2 = tile[1];
+                if (Math.abs(x1 - x2) + Math.abs(y1 - y2) === 1) {
+                    let temp = grid[x1][y1];
+                    grid[x1][y1] = grid[x2][y2];
+                    grid[x2][y2] = temp;
+                    swapSound.start();
+                    swapSound.stop(audioContext.currentTime + 0.1);
+                    checkForMatches();
+                }
+            }
+        }
+
+        function checkForMatches() {
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    if (grid[i][j].locked) {
+                        continue;
+                    }
+                    let color = grid[i][j].color;
+                    let shape = grid[i][j].shape;
+                    let matches = [];
+                    for (let k = 0; k < 8; k++) {
+                        if (grid[i][k].color === color && grid[i][k].shape === shape) {
+                            matches.push([i, k]);
+                        }
+                    }
+                    if (matches.length >= 3) {
+                        for (let k = 0; k < matches.length; k++) {
+                            grid[matches[k][0]][matches[k][1]].color = '#FFFFFF';
+                            grid[matches[k][0]][matches[k][1]].shape = 'none';
+                            currentScore += 10;
+                        }
+                        clearSound.start();
+                        clearSound.stop(audioContext.currentTime + 0.1);
+                        updateHud();
+                    }
+                }
+            }
+        }
+
+        function updateHud() {
+            hud.innerHTML = 'Time: ' + timeRemaining + ' Score: ' + currentScore + ' Level: ' + level;
+        }
+
+        function gameLoop() {
+            if (isGameRunning && !isGamePaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#CCCCCC';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        let x = i * (tileSize + gapSize);
+                        let y = j * (tileSize + gapSize);
+                        ctx.fillStyle = grid[i][j].color;
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        if (grid[i][j].shape === 'circle') {
+                            ctx.beginPath();
+                            ctx.arc(x + tileSize / 2, y + tileSize / 2, tileSize / 2, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.stroke();
+                        } else if (grid[i][j].shape === 'square') {
+                            ctx.fillRect(x, y, tileSize, tileSize);
+                            ctx.strokeRect(x, y, tileSize, tileSize);
+                        } else if (grid[i][j].shape === 'triangle') {
+                            ctx.beginPath();
+                            ctx.moveTo(x + tileSize / 2, y);
+                            ctx.lineTo(x + tileSize, y + tileSize);
+                            ctx.lineTo(x, y + tileSize);
+                            ctx.fill();
+                            ctx.stroke();
+                        } else if (grid[i][j].shape === 'diamond') {
+                            ctx.beginPath();
+                            ctx.moveTo(x + tileSize / 2, y);
+                            ctx.lineTo(x + tileSize, y + tileSize / 2);
+                            ctx.lineTo(x + tileSize / 2, y + tileSize);
+                            ctx.lineTo(x, y + tileSize / 2);
+                            ctx.fill();
+                            ctx.stroke();
+                        } else if (grid[i][j].shape === 'hexagon') {
+                            ctx.beginPath();
+                            ctx.moveTo(x + tileSize / 2, y);
+                            ctx.lineTo(x + tileSize, y + tileSize / 4);
+                            ctx.lineTo(x + tileSize, y + tileSize * 3 / 4);
+                            ctx.lineTo(x + tileSize / 2, y + tileSize);
+                            ctx.lineTo(x, y + tileSize * 3 / 4);
+                            ctx.lineTo(x, y + tileSize / 4);
+                            ctx.fill();
+                            ctx.stroke();
+                        }
+                    }
+                }
+                timeRemaining -= 1 / 60;
+                if (timeRemaining <= 0) {
+                    gameOver();
+                }
+                updateHud();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            isGamePaused = false;
+            gameOverScreen.style.display = 'block';
+            if (currentScore > bestScore) {
+                bestScore = currentScore;
+                highScores.push(bestScore);
+                highScoreList.innerHTML = 'High Scores: ' + highScores.join(', ');
+            }
+        }
+
+        init();
+    </script>
+
+<script id="cfs-responsive">
+(function() {
+  function fitCanvas() {
+    var canvases = document.getElementsByTagName('canvas');
+    if (!canvases.length) return;
+    var canvas = canvases[0];
+    var dpr = window.devicePixelRatio || 1;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    // Preserve the game's own aspect ratio if it set one via data attributes,
+    // otherwise just fill the viewport - both cases stay crisp via DPR scaling.
+    var targetW = vw;
+    var targetH = vh;
+    canvas.style.width = targetW + "px";
+    canvas.style.height = targetH + "px";
+    canvas.width = Math.round(targetW * dpr);
+    canvas.height = Math.round(targetH * dpr);
+    var evt = new Event('cfs-resize');
+    window.dispatchEvent(evt);
+  }
+  window.addEventListener('resize', fitCanvas);
+  window.addEventListener('orientationchange', function(){ setTimeout(fitCanvas, 100); });
+  document.addEventListener('DOMContentLoaded', fitCanvas);
+  window.addEventListener('load', fitCanvas);
+  fitCanvas();
+  setTimeout(fitCanvas, 50);
+  setTimeout(fitCanvas, 300);
+})();
+</script>
+</body>
+</html>
